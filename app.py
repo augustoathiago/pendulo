@@ -3,6 +3,7 @@ import numpy as np
 import streamlit as st
 import matplotlib.pyplot as plt
 import streamlit.components.v1 as components
+from matplotlib.ticker import FuncFormatter
 from pathlib import Path
 
 # ----------------------------
@@ -20,10 +21,8 @@ def fmt3(x):
         return str(x)
 
 def latex_num(x):
-    """Para usar em LaTeX com 3 algarismos significativos."""
-    # Evita notação científica confusa no LaTeX quando possível
+    """Número com 3 algarismos significativos para LaTeX."""
     s = fmt3(x)
-    # Troca e-03 -> \\times 10^{-3}
     if "e" in s or "E" in s:
         base, exp = s.replace("E", "e").split("e")
         exp = int(exp)
@@ -56,7 +55,7 @@ if "L" not in st.session_state:
 if "g" not in st.session_state:
     st.session_state.g = 9.81
 if "theta0" not in st.session_state:
-    st.session_state.theta0 = 0.200
+    st.session_state.theta0 = 0.200  # pode ser negativo agora
 
 def sync_from_slider():
     st.session_state.L = st.session_state.L_slider
@@ -72,24 +71,44 @@ c1, c2, c3 = st.columns(3)
 
 with c1:
     st.markdown("**Comprimento do pêndulo L (m)**")
-    st.slider("L_slider", 0.5, 5.0, float(st.session_state.L), 0.01, key="L_slider", on_change=sync_from_slider, label_visibility="collapsed")
-    st.number_input("L_input", 0.5, 5.0, float(st.session_state.L), 0.01, key="L_input", on_change=sync_from_input, label_visibility="collapsed")
+    st.slider(
+        "L_slider", 0.5, 5.0, float(st.session_state.L), 0.01,
+        key="L_slider", on_change=sync_from_slider, label_visibility="collapsed"
+    )
+    st.number_input(
+        "L_input", 0.5, 5.0, float(st.session_state.L), 0.01,
+        key="L_input", on_change=sync_from_input, label_visibility="collapsed"
+    )
+
 with c2:
     st.markdown("**Aceleração da gravidade g (m/s²)**")
-    st.slider("g_slider", 1.0, 20.0, float(st.session_state.g), 0.01, key="g_slider", on_change=sync_from_slider, label_visibility="collapsed")
-    st.number_input("g_input", 1.0, 20.0, float(st.session_state.g), 0.01, key="g_input", on_change=sync_from_input, label_visibility="collapsed")
+    st.slider(
+        "g_slider", 1.0, 20.0, float(st.session_state.g), 0.01,
+        key="g_slider", on_change=sync_from_slider, label_visibility="collapsed"
+    )
+    st.number_input(
+        "g_input", 1.0, 20.0, float(st.session_state.g), 0.01,
+        key="g_input", on_change=sync_from_input, label_visibility="collapsed"
+    )
+
 with c3:
-    st.markdown("**Ângulo inicial θ₀ (rad)**")
-    st.slider("theta0_slider", 0.0, 1.50, float(st.session_state.theta0), 0.001, key="theta0_slider", on_change=sync_from_slider, label_visibility="collapsed")
-    st.number_input("theta0_input", 0.0, 1.50, float(st.session_state.theta0), 0.001, key="theta0_input", on_change=sync_from_input, label_visibility="collapsed")
+    st.markdown("**Ângulo inicial θ₀ (rad)** (direita: + / esquerda: −)")
+    st.slider(
+        "theta0_slider", -1.50, 1.50, float(st.session_state.theta0), 0.001,
+        key="theta0_slider", on_change=sync_from_slider, label_visibility="collapsed"
+    )
+    st.number_input(
+        "theta0_input", -1.50, 1.50, float(st.session_state.theta0), 0.001,
+        key="theta0_input", on_change=sync_from_input, label_visibility="collapsed"
+    )
 
 L = float(st.session_state.L)
 g = float(st.session_state.g)
 theta0 = float(st.session_state.theta0)
 
-# Aviso didático
-if theta0 > 0.6:
-    st.info("ℹ️ Para θ₀ grande, a aproximação de **pequenos ângulos** perde precisão. Aqui usamos o modelo harmônico (SHM).")
+# Aviso didático (usar módulo do ângulo)
+if abs(theta0) > 0.6:
+    st.info("ℹ️ Para |θ₀| grande, a aproximação de **pequenos ângulos** perde precisão. Aqui usamos o modelo harmônico (SHM).")
 
 # ----------------------------
 # Cálculos fundamentais
@@ -113,15 +132,15 @@ with cC:
     st.latex(rf"\omega_0 = \frac{{2\pi}}{{T}} = \frac{{2\pi}}{{{latex_num(T)}}} = {latex_num(omega0)}\ \text{{rad/s}}")
 
 # ----------------------------
-# Equações (simbólica e numérica) - usando seno e indicando thetaM
-# Hipótese: solto do repouso em theta0 -> theta(t)=theta0*cos(omega0 t)
-# Reescrevendo com seno: cos(x)=sin(x+pi/2)
-# Então: theta(t)=thetaM*sin(omega0 t + pi/2) com thetaM=theta0
+# Equações + fase correta para theta0 positivo/negativo
+# Condição: solto do repouso => theta_dot(0)=0
+# theta(t)=thetaM*sin(omega0 t + phi)
+# thetaM = |theta0|
+# phi = +pi/2 (theta0>=0) ou -pi/2 (theta0<0)
 # ----------------------------
-thetaM = theta0
-phi = math.pi / 2  # condição de repouso em t=0
+thetaM = abs(theta0)
+phi = (math.pi / 2) if theta0 >= 0 else (-math.pi / 2)
 
-# Desenvolvimentos numéricos úteis
 A = thetaM
 w = omega0
 Aw = A * w
@@ -135,10 +154,11 @@ st.latex(r"\theta(t)=\theta_M\sin(\omega_0 t+\varphi)")
 st.latex(r"\dot{\theta}(t)=\theta_M\omega_0\cos(\omega_0 t+\varphi)")
 st.latex(r"\ddot{\theta}(t)=-\theta_M\omega_0^2\sin(\omega_0 t+\varphi)")
 
-st.markdown("**Condições adotadas (padrão didático):** solto do repouso em \(t=0\) com \(\theta(0)=\theta_0\Rightarrow \varphi=\pi/2\) e \(\theta_M=\theta_0\).")
-st.latex(r"\theta_M=\theta_0,\quad \varphi=\pi/2")
+# (1) Removido o bloco feio e reescrito sem escapes problemáticos
+st.markdown("**Condições adotadas:** pêndulo solto do repouso em \(t=0\), com \(\theta(0)=\theta_0\) e \(\dot{\theta}(0)=0\).")
+st.latex(rf"\theta_M=|\theta_0|,\qquad \varphi = {latex_num(phi)}")
 
-st.markdown("### Forma numérica (substituída e desenvolvida ao máximo)")
+st.markdown("### Forma numérica (substituída e desenvolvida)")
 st.latex(rf"\theta(t) = {latex_num(A)}\sin\!\left({latex_num(w)}\,t + {latex_num(phi)}\right)\ \text{{rad}}")
 st.latex(rf"\dot{{\theta}}(t) = {latex_num(A)}\cdot {latex_num(w)}\cos\!\left({latex_num(w)}\,t + {latex_num(phi)}\right) = {latex_num(Aw)}\cos\!\left({latex_num(w)}\,t + {latex_num(phi)}\right)\ \text{{rad/s}}")
 st.latex(rf"\ddot{{\theta}}(t) = -{latex_num(A)}\cdot ({latex_num(w)})^2\sin\!\left({latex_num(w)}\,t + {latex_num(phi)}\right) = -{latex_num(Aw2)}\sin\!\left({latex_num(w)}\,t + {latex_num(phi)}\right)\ \text{{rad/s}}^2")
@@ -162,7 +182,7 @@ K = 0.5 * m * (L * theta_dot) ** 2
 E = U + K
 
 # ----------------------------
-# Animação (Canvas JS embutido — suave em tempo real no navegador)
+# Animação (Canvas JS)
 # ----------------------------
 st.divider()
 st.subheader("Animação")
@@ -219,9 +239,11 @@ anim_html = f"""
     <div class="badge">θ₀ = {fmt3(theta0)} rad</div>
     <div class="badge">T = {fmt3(T)} s</div>
     <div class="badge">ω₀ = {fmt3(omega0)} rad/s</div>
+    <div class="badge">φ = {fmt3(phi)} rad</div>
     <p class="small">
+      Convenção: direita (+), esquerda (−).<br/>
       Modelo: pequenos ângulos (SHM), solto do repouso.<br/>
-      θ(t)=θ₀·sin(ω₀t+π/2).
+      θ(t)=|θ₀|·sin(ω₀t+φ).
     </p>
   </div>
 </div>
@@ -233,7 +255,8 @@ anim_html = f"""
   const theta0 = {theta0};
   const T = {T};
   const w = {omega0};
-  const phi = Math.PI/2;
+  const phi = {phi};
+  const thetaM = Math.abs(theta0);
 
   const cv = document.getElementById("cv");
   const ctx = cv.getContext("2d");
@@ -251,8 +274,8 @@ anim_html = f"""
   function draw(now) {{
     const t = (now - t0)/1000.0;
 
-    // theta(t) usando seno (como solicitado)
-    const th = theta0 * Math.sin(w*t + phi);
+    // theta(t)
+    const th = thetaM * Math.sin(w*t + phi);
 
     // posição do bob
     const x = pivot.x + lengthPx * Math.sin(th);
@@ -261,11 +284,11 @@ anim_html = f"""
     // limpar
     ctx.clearRect(0,0,W,H);
 
-    // fundo leve
+    // fundo
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0,0,W,H);
 
-    // eixos "didáticos" (somente referência)
+    // linha de referência horizontal no pivô
     ctx.strokeStyle = "#e5e7eb";
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -305,7 +328,7 @@ anim_html = f"""
     ctx.font = "14px system-ui, -apple-system, Segoe UI, Roboto, Arial";
     ctx.fillText("t = " + toPrec3(t) + " s", 16, 22);
     ctx.fillText("θ(t) = " + toPrec3(th) + " rad", 16, 42);
-    ctx.fillText("T = " + toPrec3(T) + " s", 16, 62);
+    ctx.fillText("φ = " + toPrec3(phi) + " rad", 16, 62);
     ctx.fillText("L = " + toPrec3(L) + " m", 16, 82);
 
     requestAnimationFrame(draw);
@@ -322,9 +345,16 @@ components.html(anim_html, height=460, scrolling=False)
 
 # ----------------------------
 # Gráficos (>=5 ciclos, eixos grossos na origem)
+# + ticks em 3 algarismos significativos
 # ----------------------------
 st.divider()
 st.subheader("Gráficos")
+
+sig3 = FuncFormatter(lambda x, pos: fmt3(x))
+
+def apply_sig3(ax):
+    ax.xaxis.set_major_formatter(sig3)
+    ax.yaxis.set_major_formatter(sig3)
 
 def plot_with_origin(ax, x, y, title, xlabel, ylabel, color):
     ax.plot(x, y, color=color, linewidth=2)
@@ -333,21 +363,46 @@ def plot_with_origin(ax, x, y, title, xlabel, ylabel, color):
     ax.set_ylabel(ylabel)
     ax.grid(True, alpha=0.35)
 
-    # Eixos passando pela origem com maior largura
+    # Eixos passando pela origem
     ax.axhline(0, color="black", linewidth=2.5, zorder=0)
     ax.axvline(0, color="black", linewidth=2.5, zorder=0)
 
+    apply_sig3(ax)
+
 fig1, axes = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
-plot_with_origin(axes[0], t, theta, "Posição angular", "t (s)", "θ (rad)", "#2563eb")
-plot_with_origin(axes[1], t, theta_dot, "Velocidade angular", "t (s)", "θ̇ (rad/s)", "#16a34a")
-plot_with_origin(axes[2], t, theta_ddot, "Aceleração angular", "t (s)", "θ̈ (rad/s²)", "#dc2626")
+
+plot_with_origin(
+    axes[0], t, theta,
+    "Posição angular",
+    "t (s)",
+    r"$\theta$ (rad)",
+    "#2563eb"
+)
+
+plot_with_origin(
+    axes[1], t, theta_dot,
+    "Velocidade angular",
+    "t (s)",
+    r"$\dot{\theta}$ (rad/s)",
+    "#16a34a"
+)
+
+plot_with_origin(
+    axes[2], t, theta_ddot,
+    "Aceleração angular",
+    "t (s)",
+    r"$\ddot{\theta}$ (rad/s$^2$)",
+    "#dc2626"
+)
+
 plt.tight_layout()
 st.pyplot(fig1, use_container_width=True)
 
 fig2, axE = plt.subplots(1, 1, figsize=(10, 4))
 axE.plot(t, U, label="Energia potencial U", color="#7c3aed", linewidth=2)
 axE.plot(t, K, label="Energia cinética K", color="#f59e0b", linewidth=2)
-axE.plot(t, E, label="Energia mecânica total E", color="#111827", linewidth=2.5)
+# (4) energia total em verde
+axE.plot(t, E, label="Energia mecânica total E", color="#16a34a", linewidth=2.5)
 
 axE.set_title("Energia (m = 1 kg)")
 axE.set_xlabel("t (s)")
@@ -355,6 +410,9 @@ axE.set_ylabel("Energia (J)")
 axE.grid(True, alpha=0.35)
 axE.axhline(0, color="black", linewidth=2.5, zorder=0)
 axE.axvline(0, color="black", linewidth=2.5, zorder=0)
+
+apply_sig3(axE)
+
 axE.legend()
 plt.tight_layout()
 st.pyplot(fig2, use_container_width=True)
