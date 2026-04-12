@@ -86,7 +86,7 @@ with cols[0]:
 
 with cols[1]:
     st.title("Pêndulo Simples Física II")
-    st.write("**Descrição:** Altere os parâmetros para estudar o comportamento do pêndulo simples.")
+    st.write("**Descrição:** Altere os parâmetros para estudar o comportamento de um pêndulo simples liberado do repouso.")
 
 st.divider()
 
