@@ -14,6 +14,25 @@ st.set_page_config(page_title="Pêndulo Simples Física II", layout="wide")
 
 
 # ----------------------------
+# Helpers de compatibilidade (Streamlit)
+# ----------------------------
+def st_image_full_width(image_path: str):
+    """Mostra imagem ocupando a largura disponível (compatível com versões antigas)."""
+    try:
+        st.image(image_path, use_container_width=True)  # Streamlit mais novo
+    except TypeError:
+        st.image(image_path, use_column_width=True)     # Streamlit mais antigo
+
+
+def st_pyplot_full_width(fig):
+    """Mostra figura matplotlib ocupando a largura disponível (compatível com versões antigas)."""
+    try:
+        st.pyplot(fig, use_container_width=True)
+    except TypeError:
+        st.pyplot(fig)
+
+
+# ----------------------------
 # Formatação numérica
 # ----------------------------
 def fmt3(x):
@@ -267,7 +286,7 @@ cols = st.columns([1, 6])
 
 with cols[0]:
     if logo_path.exists():
-        st.image(str(logo_path), use_container_width=True)
+        st_image_full_width(str(logo_path))
     else:
         st.caption("⚠️ Coloque `logo_maua.png` na mesma pasta do `app.py`.")
 
@@ -279,23 +298,15 @@ st.divider()
 
 
 # ----------------------------
-# Controles: modo de atualização
+# Parâmetros (SEM dica, SEM toggle, SEM N)
 # ----------------------------
 st.subheader("Parâmetros")
 
-st.caption(
-    "Dica: se o app estiver pesado no Streamlit Cloud, desative **Atualizar automaticamente** "
-    "para recalcular só quando clicar em **Aplicar**."
-)
-
-auto_update = st.toggle("Atualizar automaticamente", value=True)
-
-# Estado inicial
+# Estado inicial (sem N)
 defaults = {
     "L_slider": 1.00, "L_input": 1.00,
     "g_slider": 9.81, "g_input": 9.81,
     "theta0_slider": 0.200, "theta0_input": 0.200,
-    "N": 1500,
     "sync_lock": False,
 }
 for k, v in defaults.items():
@@ -339,64 +350,57 @@ def sync_theta_from_input():
 
 
 # ----------------------------
-# UI dos parâmetros (com ou sem form)
+# UI dos parâmetros (apenas L, g, theta0)
 # ----------------------------
 def parameter_widgets():
-    c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
+    c1, c2, c3 = st.columns([1, 1, 1])
 
     with c1:
         st.markdown("**Comprimento do pêndulo L (m)**")
-        st.slider("L_slider", 0.5, 5.0, key="L_slider", step=0.01, on_change=sync_L_from_slider, label_visibility="collapsed")
-        st.number_input("L_input", 0.5, 5.0, key="L_input", step=0.01, on_change=sync_L_from_input, label_visibility="collapsed")
+        st.slider("L_slider", 0.5, 5.0, key="L_slider", step=0.01,
+                  on_change=sync_L_from_slider, label_visibility="collapsed")
+        st.number_input("L_input", 0.5, 5.0, key="L_input", step=0.01,
+                        on_change=sync_L_from_input, label_visibility="collapsed")
 
     with c2:
         st.markdown("**Aceleração da gravidade g (m/s²)**")
-        st.slider("g_slider", 1.0, 20.0, key="g_slider", step=0.01, on_change=sync_g_from_slider, label_visibility="collapsed")
-        st.number_input("g_input", 1.0, 20.0, key="g_input", step=0.01, on_change=sync_g_from_input, label_visibility="collapsed")
+        st.slider("g_slider", 1.0, 20.0, key="g_slider", step=0.01,
+                  on_change=sync_g_from_slider, label_visibility="collapsed")
+        st.number_input("g_input", 1.0, 20.0, key="g_input", step=0.01,
+                        on_change=sync_g_from_input, label_visibility="collapsed")
 
     with c3:
         st.markdown("**Ângulo inicial θ₀ (rad)** (direita: + / esquerda: −)")
-        st.slider("theta0_slider", -1.50, 1.50, key="theta0_slider", step=0.001, on_change=sync_theta_from_slider, label_visibility="collapsed")
-        st.number_input("theta0_input", -1.50, 1.50, key="theta0_input", step=0.001, on_change=sync_theta_from_input, label_visibility="collapsed")
-
-    with c4:
-        st.markdown("**Resolução N (pontos)**")
-        st.slider("N", 400, 2500, key="N", step=50, label_visibility="collapsed")
+        st.slider("theta0_slider", -1.50, 1.50, key="theta0_slider", step=0.001,
+                  on_change=sync_theta_from_slider, label_visibility="collapsed")
+        st.number_input("theta0_input", -1.50, 1.50, key="theta0_input", step=0.001,
+                        on_change=sync_theta_from_input, label_visibility="collapsed")
 
 
-if auto_update:
-    parameter_widgets()
-    applied = True
-else:
-    with st.form("params_form", clear_on_submit=False):
-        parameter_widgets()
-        applied = st.form_submit_button("Aplicar")
-
+parameter_widgets()
 
 # Lê parâmetros (sincronizados)
 L = float(st.session_state.L_slider)
 g = float(st.session_state.g_slider)
 theta0 = float(st.session_state.theta0_slider)
-N = int(st.session_state.N)
+
+# N fixo (sem controle na tela)
+N_FIXED = 1500
 n_cycles = 5
 
-
 if abs(theta0) > 0.2:
-    st.info("ℹ️ Para |θ₀| grande, a aproximação de **pequenos ângulos** perde precisão. "
-            "Aqui usamos o modelo de movimento harmônico simples.")
-
-
-# ----------------------------
-# Só calcula/mostra se o usuário aplicou (no modo manual)
-# ----------------------------
-if not applied:
-    st.stop()
+    st.info(
+        "ℹ️ Para |θ₀| grande, a aproximação de **pequenos ângulos** perde precisão. "
+        "Aqui usamos o modelo de movimento harmônico simples."
+    )
 
 
 # ----------------------------
 # Cálculos + séries (cacheado)
 # ----------------------------
-T, f, omega0, phi, t, theta, theta_dot, theta_ddot, U, K, E = compute_series(L, g, theta0, n_cycles, N)
+T, f, omega0, phi, t, theta, theta_dot, theta_ddot, U, K, E = compute_series(
+    L, g, theta0, n_cycles, N_FIXED
+)
 
 st.divider()
 st.subheader("Cálculos")
@@ -404,13 +408,17 @@ st.subheader("Cálculos")
 cA, cB, cC = st.columns(3)
 with cA:
     st.markdown("**Período**")
-    st.latex(rf"T = 2\pi\sqrt{{\frac{{L}}{{g}}}} = 2\pi\sqrt{{\frac{{{latex_num(L)}}}{{{latex_num(g)}}}}} = {latex_num(T)}\ \text{{s}}")
+    st.latex(
+        rf"T = 2\pi\sqrt{{\frac{{L}}{{g}}}} = 2\pi\sqrt{{\frac{{{latex_num(L)}}}{{{latex_num(g)}}}}} = {latex_num(T)}\ \text{{s}}"
+    )
 with cB:
     st.markdown("**Frequência**")
     st.latex(rf"f = \frac{{1}}{{T}} = \frac{{1}}{{{latex_num(T)}}} = {latex_num(f)}\ \text{{Hz}}")
 with cC:
     st.markdown("**Frequência angular natural**")
-    st.latex(rf"\omega_0 = \frac{{2\pi}}{{T}} = \frac{{2\pi}}{{{latex_num(T)}}} = {latex_num(omega0)}\ \text{{rad/s}}")
+    st.latex(
+        rf"\omega_0 = \frac{{2\pi}}{{T}} = \frac{{2\pi}}{{{latex_num(T)}}} = {latex_num(omega0)}\ \text{{rad/s}}"
+    )
 
 
 # ----------------------------
@@ -437,18 +445,13 @@ st.latex(rf"\ddot{{\theta}}(t) = -{latex_num(Aw2)}\sin\!\left({latex_num(w)}\,t 
 
 
 # ----------------------------
-# Animação (Canvas JS) — cacheado
+# Animação (SEMPRE ligada)
 # ----------------------------
 st.divider()
 st.subheader("Animação")
 
-show_anim = st.toggle("Mostrar animação", value=True)
-
-if show_anim:
-    anim_html = build_anim_html(L, g, theta0, T, omega0, phi)
-    components.html(anim_html, height=460, scrolling=False)
-else:
-    st.caption("Animação desativada para economizar recursos.")
+anim_html = build_anim_html(L, g, theta0, T, omega0, phi)
+components.html(anim_html, height=460, scrolling=False)
 
 
 # ----------------------------
@@ -497,8 +500,8 @@ plot_with_origin(
 )
 
 plt.tight_layout()
-st.pyplot(fig1, use_container_width=True)
-plt.close(fig1)  # <- MUITO IMPORTANTE: evita acumular memória em reruns
+st_pyplot_full_width(fig1)
+plt.close(fig1)  # evita acumular memória em reruns
 
 
 # Figura 2 (energias)
@@ -518,7 +521,7 @@ apply_sig3(axE)
 axE.legend()
 
 plt.tight_layout()
-st.pyplot(fig2, use_container_width=True)
-plt.close(fig2)  # <- MUITO IMPORTANTE
+st_pyplot_full_width(fig2)
+plt.close(fig2)  # evita acumular memória em reruns
 
 st.caption("Observação: energias calculadas no regime de pequenos ângulos (aproximação harmônica), com massa m = 1 kg.")
