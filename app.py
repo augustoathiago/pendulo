@@ -31,7 +31,7 @@ def latex_num(x):
 
 def sig3_tick(x):
     """
-    Formata ticks com 3 algarismos significativos FIXOS, mantendo zeros finais.
+    Ticks com 3 algarismos significativos FIXOS, mantendo zeros finais.
     Exemplos:
       0.2   -> 0.200
       0.15  -> 0.150
@@ -46,13 +46,14 @@ def sig3_tick(x):
             return "0"
         ax = abs(x)
         exp = int(math.floor(math.log10(ax)))
+
         # notação científica para valores muito grandes/pequenos
         if exp >= 3 or exp <= -4:
             mant = ax / (10 ** exp)
             sign = "-" if x < 0 else ""
             return f"{sign}{mant:.2f}e{exp}"
 
-        # notação fixa: (exp+1) dígitos antes + dec casas = 3 algarismos
+        # notação fixa com casas necessárias para garantir 3 AS
         dec = 2 - exp
         if dec < 0:
             dec = 0
@@ -63,10 +64,13 @@ def sig3_tick(x):
 sig3_formatter = FuncFormatter(lambda x, pos: sig3_tick(x))
 
 def apply_sig3(ax):
-    """Aplica formatter 3 AS nos eixos x e y e remove offset automático."""
+    """Aplica formatter 3 AS nos eixos x e y e remove textos de offset."""
     ax.xaxis.set_major_formatter(sig3_formatter)
     ax.yaxis.set_major_formatter(sig3_formatter)
-    ax.ticklabel_format(axis="both", style="plain", useOffset=False)
+
+    # Remove offset (ex.: "1e-3") de forma segura
+    ax.xaxis.get_offset_text().set_visible(False)
+    ax.yaxis.get_offset_text().set_visible(False)
 
 # ----------------------------
 # Cabeçalho (logo + título + descrição)
@@ -155,7 +159,7 @@ if abs(theta0) > 0.6:
 # ----------------------------
 T = 2 * math.pi * math.sqrt(L / g)
 f = 1 / T
-omega0 = 2 * math.pi / T  # = sqrt(g/L)
+omega0 = 2 * math.pi / T
 
 st.divider()
 st.subheader("Cálculos")
@@ -172,11 +176,11 @@ with cC:
     st.latex(rf"\omega_0 = \frac{{2\pi}}{{T}} = \frac{{2\pi}}{{{latex_num(T)}}} = {latex_num(omega0)}\ \text{{rad/s}}")
 
 # ----------------------------
-# Equações + fase com theta0 positivo/negativo
-# Condição: solto do repouso => theta_dot(0)=0
+# Equações (SEM "Condições adotadas")
+# + theta0 pode ser negativo, ajustando a fase
 # theta(t)=thetaM*sin(omega0 t + phi)
 # thetaM = |theta0|
-# phi = +pi/2 (theta0>=0) ou -pi/2 (theta0<0)
+# phi = +pi/2 (theta0>=0) ou -pi/2 (theta0<0) para manter theta(0)=theta0 e dot(0)=0
 # ----------------------------
 thetaM = abs(theta0)
 phi = (math.pi / 2) if theta0 >= 0 else (-math.pi / 2)
@@ -196,8 +200,8 @@ st.latex(r"\ddot{\theta}(t)=-\theta_M\omega_0^2\sin(\omega_0 t+\varphi)")
 
 st.markdown("### Forma numérica (substituída e desenvolvida)")
 st.latex(rf"\theta(t) = {latex_num(A)}\sin\!\left({latex_num(w)}\,t + {latex_num(phi)}\right)\ \text{{rad}}")
-st.latex(rf"\dot{{\theta}}(t) = {latex_num(A)}\cdot {latex_num(w)}\cos\!\left({latex_num(w)}\,t + {latex_num(phi)}\right) = {latex_num(Aw)}\cos\!\left({latex_num(w)}\,t + {latex_num(phi)}\right)\ \text{{rad/s}}")
-st.latex(rf"\ddot{{\theta}}(t) = -{latex_num(A)}\cdot ({latex_num(w)})^2\sin\!\left({latex_num(w)}\,t + {latex_num(phi)}\right) = -{latex_num(Aw2)}\sin\!\left({latex_num(w)}\,t + {latex_num(phi)}\right)\ \text{{rad/s}}^2")
+st.latex(rf"\dot{{\theta}}(t) = {latex_num(Aw)}\cos\!\left({latex_num(w)}\,t + {latex_num(phi)}\right)\ \text{{rad/s}}")
+st.latex(rf"\ddot{{\theta}}(t) = -{latex_num(Aw2)}\sin\!\left({latex_num(w)}\,t + {latex_num(phi)}\right)\ \text{{rad/s}}^2")
 
 # ----------------------------
 # Série temporal para gráficos (>=5 ciclos)
@@ -211,7 +215,7 @@ theta = thetaM * np.sin(omega0 * t + phi)
 theta_dot = thetaM * omega0 * np.cos(omega0 * t + phi)
 theta_ddot = -thetaM * omega0**2 * np.sin(omega0 * t + phi)
 
-# Energia (assumindo massa m = 1 kg)
+# Energia (m = 1 kg)
 m = 1.0
 U = 0.5 * m * g * L * theta**2
 K = 0.5 * m * (L * theta_dot) ** 2
@@ -287,7 +291,6 @@ anim_html = f"""
 (() => {{
   const L = {L};
   const theta0 = {theta0};
-  const T = {T};
   const w = {omega0};
   const phi = {phi};
   const thetaM = Math.abs(theta0);
@@ -350,8 +353,6 @@ anim_html = f"""
     ctx.font = "14px system-ui, -apple-system, Segoe UI, Roboto, Arial";
     ctx.fillText("t = " + toPrec3(t) + " s", 16, 22);
     ctx.fillText("θ(t) = " + toPrec3(th) + " rad", 16, 42);
-    ctx.fillText("φ = " + toPrec3(phi) + " rad", 16, 62);
-    ctx.fillText("L = " + toPrec3(L) + " m", 16, 82);
 
     requestAnimationFrame(draw);
   }}
