@@ -11,12 +11,27 @@ from pathlib import Path
 # ----------------------------
 st.set_page_config(page_title="Pêndulo Simples Física II", layout="wide")
 
-# ----------------------------
-# Formatação: 3 algarismos significativos (3 AS) com zeros finais
-# ----------------------------
-def sig3_str(x: float) -> str:
+def fmt3(x):
+    """3 algarismos significativos (string) - para badges/textos."""
+    try:
+        if x == 0:
+            return "0"
+        return f"{x:.3g}"
+    except Exception:
+        return str(x)
+
+def latex_num(x):
+    """Número com 3 algarismos significativos para LaTeX."""
+    s = fmt3(x)
+    if "e" in s or "E" in s:
+        base, exp = s.replace("E", "e").split("e")
+        exp = int(exp)
+        return rf"{base}\times 10^{{{exp}}}"
+    return s
+
+def sig3_tick(x):
     """
-    Retorna string com 3 algarismos significativos FIXOS, mantendo zeros finais.
+    Ticks com 3 algarismos significativos FIXOS, mantendo zeros finais.
     Exemplos:
       0.2   -> 0.200
       0.15  -> 0.150
@@ -32,13 +47,13 @@ def sig3_str(x: float) -> str:
         ax = abs(x)
         exp = int(math.floor(math.log10(ax)))
 
-        # científica para muito grande/pequeno
+        # notação científica para valores muito grandes/pequenos
         if exp >= 3 or exp <= -4:
             mant = ax / (10 ** exp)
             sign = "-" if x < 0 else ""
             return f"{sign}{mant:.2f}e{exp}"
 
-        # fixa: (exp+1) dígitos antes + dec casas = 3 AS
+        # notação fixa com casas necessárias para garantir 3 AS
         dec = 2 - exp
         if dec < 0:
             dec = 0
@@ -46,22 +61,14 @@ def sig3_str(x: float) -> str:
     except Exception:
         return str(x)
 
-def sig3_latex(x: float) -> str:
-    """Versão LaTeX com 3 AS fixos; converte 'e' em ×10^{...} quando necessário."""
-    s = sig3_str(x)
-    if "e" in s:
-        base, exp = s.split("e")
-        exp = int(exp)
-        return rf"{base}\times 10^{{{exp}}}"
-    return s
-
-# Formatter para eixos do Matplotlib com 3 AS fixos
-sig3_formatter = FuncFormatter(lambda x, pos: sig3_str(x))
+sig3_formatter = FuncFormatter(lambda x, pos: sig3_tick(x))
 
 def apply_sig3(ax):
+    """Aplica formatter 3 AS nos eixos x e y e remove textos de offset."""
     ax.xaxis.set_major_formatter(sig3_formatter)
     ax.yaxis.set_major_formatter(sig3_formatter)
-    # remove textos de offset com segurança (evita AttributeError)
+
+    # Remove offset (ex.: "1e-3") de forma segura
     ax.xaxis.get_offset_text().set_visible(False)
     ax.yaxis.get_offset_text().set_visible(False)
 
@@ -111,43 +118,34 @@ with c1:
     st.markdown("**Comprimento do pêndulo L (m)**")
     st.slider(
         "L_slider", 0.5, 5.0, float(st.session_state.L), 0.01,
-        key="L_slider", on_change=sync_from_slider, label_visibility="collapsed",
-        format="%.3g"
+        key="L_slider", on_change=sync_from_slider, label_visibility="collapsed"
     )
     st.number_input(
         "L_input", 0.5, 5.0, float(st.session_state.L), 0.01,
-        key="L_input", on_change=sync_from_input, label_visibility="collapsed",
-        format="%.3g"
+        key="L_input", on_change=sync_from_input, label_visibility="collapsed"
     )
-    st.caption(f"Valor (3 AS): **{sig3_str(float(st.session_state.L))} m**")
 
 with c2:
     st.markdown("**Aceleração da gravidade g (m/s²)**")
     st.slider(
         "g_slider", 1.0, 20.0, float(st.session_state.g), 0.01,
-        key="g_slider", on_change=sync_from_slider, label_visibility="collapsed",
-        format="%.3g"
+        key="g_slider", on_change=sync_from_slider, label_visibility="collapsed"
     )
     st.number_input(
         "g_input", 1.0, 20.0, float(st.session_state.g), 0.01,
-        key="g_input", on_change=sync_from_input, label_visibility="collapsed",
-        format="%.3g"
+        key="g_input", on_change=sync_from_input, label_visibility="collapsed"
     )
-    st.caption(f"Valor (3 AS): **{sig3_str(float(st.session_state.g))} m/s²**")
 
 with c3:
     st.markdown("**Ângulo inicial θ₀ (rad)** (direita: + / esquerda: −)")
     st.slider(
         "theta0_slider", -1.50, 1.50, float(st.session_state.theta0), 0.001,
-        key="theta0_slider", on_change=sync_from_slider, label_visibility="collapsed",
-        format="%.3g"
+        key="theta0_slider", on_change=sync_from_slider, label_visibility="collapsed"
     )
     st.number_input(
         "theta0_input", -1.50, 1.50, float(st.session_state.theta0), 0.001,
-        key="theta0_input", on_change=sync_from_input, label_visibility="collapsed",
-        format="%.3g"
+        key="theta0_input", on_change=sync_from_input, label_visibility="collapsed"
     )
-    st.caption(f"Valor (3 AS): **{sig3_str(float(st.session_state.theta0))} rad**")
 
 L = float(st.session_state.L)
 g = float(st.session_state.g)
@@ -169,16 +167,17 @@ st.subheader("Cálculos")
 cA, cB, cC = st.columns(3)
 with cA:
     st.markdown("**Período**")
-    st.latex(rf"T = 2\pi\sqrt{{\frac{{L}}{{g}}}} = 2\pi\sqrt{{\frac{{{sig3_latex(L)}}}{{{sig3_latex(g)}}}}} = {sig3_latex(T)}\ \text{{s}}")
+    st.latex(rf"T = 2\pi\sqrt{{\frac{{L}}{{g}}}} = 2\pi\sqrt{{\frac{{{latex_num(L)}}}{{{latex_num(g)}}}}} = {latex_num(T)}\ \text{{s}}")
 with cB:
     st.markdown("**Frequência**")
-    st.latex(rf"f = \frac{{1}}{{T}} = \frac{{1}}{{{sig3_latex(T)}}} = {sig3_latex(f)}\ \text{{Hz}}")
+    st.latex(rf"f = \frac{{1}}{{T}} = \frac{{1}}{{{latex_num(T)}}} = {latex_num(f)}\ \text{{Hz}}")
 with cC:
     st.markdown("**Frequência angular natural**")
-    st.latex(rf"\omega_0 = \frac{{2\pi}}{{T}} = \frac{{2\pi}}{{{sig3_latex(T)}}} = {sig3_latex(omega0)}\ \text{{rad/s}}")
+    st.latex(rf"\omega_0 = \frac{{2\pi}}{{T}} = \frac{{2\pi}}{{{latex_num(T)}}} = {latex_num(omega0)}\ \text{{rad/s}}")
 
 # ----------------------------
-# Equações (somente as duas partes pedidas)
+# Equações (SEM "Condições adotadas")
+# + theta0 pode ser negativo, ajustando a fase
 # theta(t)=thetaM*sin(omega0 t + phi)
 # thetaM = |theta0|
 # phi = +pi/2 (theta0>=0) ou -pi/2 (theta0<0) para manter theta(0)=theta0 e dot(0)=0
@@ -200,9 +199,9 @@ st.latex(r"\dot{\theta}(t)=\theta_M\omega_0\cos(\omega_0 t+\varphi)")
 st.latex(r"\ddot{\theta}(t)=-\theta_M\omega_0^2\sin(\omega_0 t+\varphi)")
 
 st.markdown("### Forma numérica (substituída e desenvolvida)")
-st.latex(rf"\theta(t) = {sig3_latex(A)}\sin\!\left({sig3_latex(w)}\,t + {sig3_latex(phi)}\right)\ \text{{rad}}")
-st.latex(rf"\dot{{\theta}}(t) = {sig3_latex(Aw)}\cos\!\left({sig3_latex(w)}\,t + {sig3_latex(phi)}\right)\ \text{{rad/s}}")
-st.latex(rf"\ddot{{\theta}}(t) = -{sig3_latex(Aw2)}\sin\!\left({sig3_latex(w)}\,t + {sig3_latex(phi)}\right)\ \text{{rad/s}}^2")
+st.latex(rf"\theta(t) = {latex_num(A)}\sin\!\left({latex_num(w)}\,t + {latex_num(phi)}\right)\ \text{{rad}}")
+st.latex(rf"\dot{{\theta}}(t) = {latex_num(Aw)}\cos\!\left({latex_num(w)}\,t + {latex_num(phi)}\right)\ \text{{rad/s}}")
+st.latex(rf"\ddot{{\theta}}(t) = -{latex_num(Aw2)}\sin\!\left({latex_num(w)}\,t + {latex_num(phi)}\right)\ \text{{rad/s}}^2")
 
 # ----------------------------
 # Série temporal para gráficos (>=5 ciclos)
@@ -275,12 +274,12 @@ anim_html = f"""
   <canvas id="cv" width="640" height="420"></canvas>
   <div class="meta">
     <h4>Parâmetros (3 algarismos significativos)</h4>
-    <div class="badge">L = {sig3_str(L)} m</div>
-    <div class="badge">g = {sig3_str(g)} m/s²</div>
-    <div class="badge">θ₀ = {sig3_str(theta0)} rad</div>
-    <div class="badge">T = {sig3_str(T)} s</div>
-    <div class="badge">ω₀ = {sig3_str(omega0)} rad/s</div>
-    <div class="badge">φ = {sig3_str(phi)} rad</div>
+    <div class="badge">L = {fmt3(L)} m</div>
+    <div class="badge">g = {fmt3(g)} m/s²</div>
+    <div class="badge">θ₀ = {fmt3(theta0)} rad</div>
+    <div class="badge">T = {fmt3(T)} s</div>
+    <div class="badge">ω₀ = {fmt3(omega0)} rad/s</div>
+    <div class="badge">φ = {fmt3(phi)} rad</div>
     <p class="small">
       Convenção: direita (+), esquerda (−).<br/>
       θ(t)=|θ₀|·sin(ω₀t+φ).
@@ -364,11 +363,12 @@ anim_html = f"""
 </body>
 </html>
 """
+
 components.html(anim_html, height=460, scrolling=False)
 
 # ----------------------------
 # Gráficos (>=5 ciclos, eixos grossos na origem)
-# + ticks com 3 AS em TODOS os eixos
+# + TODOS os eixos com ticks em 3 AS FIXOS
 # ----------------------------
 st.divider()
 st.subheader("Gráficos")
@@ -387,9 +387,27 @@ def plot_with_origin(ax, x, y, title, xlabel, ylabel, color):
 
 fig1, axes = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
 
-plot_with_origin(axes[0], t, theta, "Posição angular", "t (s)", r"$\theta$ (rad)", "#2563eb")
-plot_with_origin(axes[1], t, theta_dot, "Velocidade angular", "t (s)", r"$\dot{\theta}$ (rad/s)", "#16a34a")
-plot_with_origin(axes[2], t, theta_ddot, "Aceleração angular", "t (s)", r"$\ddot{\theta}$ (rad/s$^2$)", "#dc2626")
+plot_with_origin(
+    axes[0], t, theta,
+    "Posição angular",
+    "t (s)",
+    r"$\theta$ (rad)",
+    "#2563eb"
+)
+plot_with_origin(
+    axes[1], t, theta_dot,
+    "Velocidade angular",
+    "t (s)",
+    r"$\dot{\theta}$ (rad/s)",
+    "#16a34a"
+)
+plot_with_origin(
+    axes[2], t, theta_ddot,
+    "Aceleração angular",
+    "t (s)",
+    r"$\ddot{\theta}$ (rad/s$^2$)",
+    "#dc2626"
+)
 
 plt.tight_layout()
 st.pyplot(fig1, use_container_width=True)
@@ -405,6 +423,7 @@ axE.set_ylabel("Energia (J)")
 axE.grid(True, alpha=0.35)
 axE.axhline(0, color="black", linewidth=2.5, zorder=0)
 axE.axvline(0, color="black", linewidth=2.5, zorder=0)
+
 apply_sig3(axE)
 axE.legend()
 
