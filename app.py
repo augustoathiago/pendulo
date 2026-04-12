@@ -152,7 +152,7 @@ g = float(st.session_state.g)
 theta0 = float(st.session_state.theta0)
 
 if abs(theta0) > 0.2:
-    st.info("ℹ️ Para |θ₀| grande, a aproximação de **pequenos ângulos** perde precisão. Aqui usamos o modelo harmônico (SHM).")
+    st.info("ℹ️ Para |θ₀| grande, a aproximação de **pequenos ângulos** perde precisão. Aqui usamos o modelo de movimento harmônico simples.")
 
 # ----------------------------
 # Cálculos fundamentais
