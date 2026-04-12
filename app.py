@@ -12,7 +12,7 @@ from pathlib import Path
 st.set_page_config(page_title="Pêndulo Simples Física II", layout="wide")
 
 def fmt3(x):
-    """3 algarismos significativos (string)."""
+    """3 algarismos significativos (string) - para badges/textos."""
     try:
         if x == 0:
             return "0"
@@ -29,18 +29,60 @@ def latex_num(x):
         return rf"{base}\times 10^{{{exp}}}"
     return s
 
+def sig3_tick(x):
+    """
+    Formata ticks com 3 algarismos significativos, mantendo zeros finais.
+    Exemplos:
+      0.2   -> 0.200
+      0.15  -> 0.150
+      0.05  -> 0.0500
+      1.2   -> 1.20
+      12    -> 12.0
+      123   -> 123
+      1234  -> 1.23e3 (notação científica para valores grandes)
+    """
+    try:
+        if x == 0:
+            return "0"
+        ax = abs(x)
+        sign = "-" if x < 0 else ""
+
+        exp = int(math.floor(math.log10(ax)))
+
+        # Usa notação científica fora de uma faixa "boa" para notação fixa
+        # (padrão parecido com o do formato geral)
+        if exp >= 3 or exp <= -4:
+            mant = ax / (10 ** exp)
+            return f"{sign}{mant:.2f}e{exp}"
+
+        # Notação fixa com número de casas necessário para garantir 3 AS
+        dec = 2 - exp  # porque (exp+1) + dec = 3  => dec = 2-exp
+        if dec < 0:
+            dec = 0
+        return f"{x:.{dec}f}"
+    except Exception:
+        return str(x)
+
+sig3_formatter = FuncFormatter(lambda x, pos: sig3_tick(x))
+
+def apply_sig3(ax):
+    """Aplica formatter de 3 AS em ambos os eixos + remove offset automático."""
+    ax.xaxis.set_major_formatter(sig3_formatter)
+    ax.yaxis.set_major_formatter(sig3_formatter)
+    ax.ticklabel_format(axis="both", style="plain", useOffset=False)
+
 # ----------------------------
 # Cabeçalho (logo + título + descrição)
 # ----------------------------
 logo_path = Path("logo_maua.png")
 cols = st.columns([1, 6])
-with cols[0]:
-    if logo_path.exists():
+
+with colsif logo_path.exists():
         st.image(str(logo_path), use_column_width=True)
     else:
         st.caption("⚠️ Coloque `logo_maua.png` na mesma pasta do `app.py`.")
-with cols[1]:
-    st.title("Pêndulo Simples Física II")
+
+with colsst.title("Pêndulo Simples Física II")
     st.write("**Descrição:** Altere os parâmetros para estudar o comportamento do pêndulo simples.")
 
 st.divider()
@@ -55,7 +97,7 @@ if "L" not in st.session_state:
 if "g" not in st.session_state:
     st.session_state.g = 9.81
 if "theta0" not in st.session_state:
-    st.session_state.theta0 = 0.200  # pode ser negativo agora
+    st.session_state.theta0 = 0.200  # pode ser negativo
 
 def sync_from_slider():
     st.session_state.L = st.session_state.L_slider
@@ -106,7 +148,6 @@ L = float(st.session_state.L)
 g = float(st.session_state.g)
 theta0 = float(st.session_state.theta0)
 
-# Aviso didático (usar módulo do ângulo)
 if abs(theta0) > 0.6:
     st.info("ℹ️ Para |θ₀| grande, a aproximação de **pequenos ângulos** perde precisão. Aqui usamos o modelo harmônico (SHM).")
 
@@ -132,7 +173,7 @@ with cC:
     st.latex(rf"\omega_0 = \frac{{2\pi}}{{T}} = \frac{{2\pi}}{{{latex_num(T)}}} = {latex_num(omega0)}\ \text{{rad/s}}")
 
 # ----------------------------
-# Equações + fase correta para theta0 positivo/negativo
+# Equações + fase com theta0 positivo/negativo
 # Condição: solto do repouso => theta_dot(0)=0
 # theta(t)=thetaM*sin(omega0 t + phi)
 # thetaM = |theta0|
@@ -153,10 +194,6 @@ st.markdown("### Forma simbólica (letras)")
 st.latex(r"\theta(t)=\theta_M\sin(\omega_0 t+\varphi)")
 st.latex(r"\dot{\theta}(t)=\theta_M\omega_0\cos(\omega_0 t+\varphi)")
 st.latex(r"\ddot{\theta}(t)=-\theta_M\omega_0^2\sin(\omega_0 t+\varphi)")
-
-# (1) Removido o bloco feio e reescrito sem escapes problemáticos
-st.markdown("**Condições adotadas:** pêndulo solto do repouso em \(t=0\), com \(\theta(0)=\theta_0\) e \(\dot{\theta}(0)=0\).")
-st.latex(rf"\theta_M=|\theta_0|,\qquad \varphi = {latex_num(phi)}")
 
 st.markdown("### Forma numérica (substituída e desenvolvida)")
 st.latex(rf"\theta(t) = {latex_num(A)}\sin\!\left({latex_num(w)}\,t + {latex_num(phi)}\right)\ \text{{rad}}")
@@ -251,7 +288,6 @@ anim_html = f"""
 <script>
 (() => {{
   const L = {L};
-  const g = {g};
   const theta0 = {theta0};
   const T = {T};
   const w = {omega0};
@@ -273,22 +309,15 @@ anim_html = f"""
 
   function draw(now) {{
     const t = (now - t0)/1000.0;
-
-    // theta(t)
     const th = thetaM * Math.sin(w*t + phi);
 
-    // posição do bob
     const x = pivot.x + lengthPx * Math.sin(th);
     const y = pivot.y + lengthPx * Math.cos(th);
 
-    // limpar
     ctx.clearRect(0,0,W,H);
-
-    // fundo
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0,0,W,H);
 
-    // linha de referência horizontal no pivô
     ctx.strokeStyle = "#e5e7eb";
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -296,7 +325,6 @@ anim_html = f"""
     ctx.lineTo(W, pivot.y);
     ctx.stroke();
 
-    // suporte
     ctx.strokeStyle = "#111827";
     ctx.lineWidth = 3;
     ctx.beginPath();
@@ -304,7 +332,6 @@ anim_html = f"""
     ctx.lineTo(pivot.x + 60, pivot.y);
     ctx.stroke();
 
-    // corda
     ctx.strokeStyle = "#374151";
     ctx.lineWidth = 4;
     ctx.beginPath();
@@ -312,18 +339,15 @@ anim_html = f"""
     ctx.lineTo(x, y);
     ctx.stroke();
 
-    // bob
     ctx.fillStyle = "#2563eb";
     ctx.beginPath();
     ctx.arc(x, y, bobR, 0, Math.PI*2);
     ctx.fill();
 
-    // contorno
     ctx.strokeStyle = "rgba(17,24,39,0.35)";
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // texto
     ctx.fillStyle = "#111827";
     ctx.font = "14px system-ui, -apple-system, Segoe UI, Roboto, Arial";
     ctx.fillText("t = " + toPrec3(t) + " s", 16, 22);
@@ -345,16 +369,10 @@ components.html(anim_html, height=460, scrolling=False)
 
 # ----------------------------
 # Gráficos (>=5 ciclos, eixos grossos na origem)
-# + ticks em 3 algarismos significativos
+# + TODOS os eixos com ticks em 3 AS
 # ----------------------------
 st.divider()
 st.subheader("Gráficos")
-
-sig3 = FuncFormatter(lambda x, pos: fmt3(x))
-
-def apply_sig3(ax):
-    ax.xaxis.set_major_formatter(sig3)
-    ax.yaxis.set_major_formatter(sig3)
 
 def plot_with_origin(ax, x, y, title, xlabel, ylabel, color):
     ax.plot(x, y, color=color, linewidth=2)
@@ -363,7 +381,6 @@ def plot_with_origin(ax, x, y, title, xlabel, ylabel, color):
     ax.set_ylabel(ylabel)
     ax.grid(True, alpha=0.35)
 
-    # Eixos passando pela origem
     ax.axhline(0, color="black", linewidth=2.5, zorder=0)
     ax.axvline(0, color="black", linewidth=2.5, zorder=0)
 
@@ -395,14 +412,16 @@ plot_with_origin(
     "#dc2626"
 )
 
+# Como sharex=True, garante formatter também no eixo x do último
+apply_sig3(axes[2])
+
 plt.tight_layout()
 st.pyplot(fig1, use_container_width=True)
 
 fig2, axE = plt.subplots(1, 1, figsize=(10, 4))
 axE.plot(t, U, label="Energia potencial U", color="#7c3aed", linewidth=2)
 axE.plot(t, K, label="Energia cinética K", color="#f59e0b", linewidth=2)
-# (4) energia total em verde
-axE.plot(t, E, label="Energia mecânica total E", color="#16a34a", linewidth=2.5)
+axE.plot(t, E, label="Energia mecânica total E", color="#16a34a", linewidth=2.5)  # verde
 
 axE.set_title("Energia (m = 1 kg)")
 axE.set_xlabel("t (s)")
