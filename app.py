@@ -124,6 +124,12 @@ def compute_scalars(L, g, theta0):
 # ----------------------------
 @st.cache_data(ttl=3600, max_entries=64, show_spinner=False)
 def build_anim_html(L, g, theta0, T, omega0, phi):
+    """
+    Melhorias mobile:
+    - Container horizontal rolável por toque (finger swipe)
+    - 'Arraste para o lado...' aparece no mobile
+    - (opcional) drag-to-scroll no desktop com mouse
+    """
     L, g, theta0 = quantize_params(L, g, theta0)
     T = float(T)
     omega0 = float(omega0)
@@ -134,23 +140,62 @@ def build_anim_html(L, g, theta0, T, omega0, phi):
 <html>
 <head>
 <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
-  .wrap {{
+  :root {{
+    --card: #ffffff;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --shadow: 0 4px 16px rgba(0,0,0,0.08);
+  }}
+
+  body {{
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  }}
+
+  /* ====== NOVO: container rolável horizontal ====== */
+  .scroll-x {{
     width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch; /* iOS smooth scroll */
+    touch-action: pan-x;               /* prioriza gesto horizontal */
+    overscroll-behavior-x: contain;
+    padding: 2px 2px 10px 2px;
+    box-sizing: border-box;
+    cursor: grab;
+  }}
+  .scroll-x:active {{
+    cursor: grabbing;
+  }}
+
+  /* conteúdo interno precisa “ter largura” para gerar overflow */
+  .content {{
     display: flex;
     gap: 16px;
     align-items: flex-start;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;       /* não quebrar linha => vira rolagem horizontal */
+    width: max-content;      /* largura do conteúdo */
+    padding: 6px;
+    box-sizing: border-box;
   }}
+
   canvas {{
     border: 1px solid #ddd;
     border-radius: 14px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-    background: #fff;
+    box-shadow: var(--shadow);
+    background: var(--card);
+    flex: 0 0 auto;
   }}
+
   .meta {{
-    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
     min-width: 260px;
+    max-width: 360px;
+    flex: 0 0 auto;
+    background: rgba(255,255,255,0.0);
   }}
   .meta h4 {{
     margin: 0 0 8px 0;
@@ -163,34 +208,69 @@ def build_anim_html(L, g, theta0, T, omega0, phi):
     background: #f3f4f6;
     margin: 4px 6px 0 0;
     font-size: 12px;
+    border: 1px solid var(--line);
   }}
   .small {{
     color: #444;
     font-size: 13px;
     line-height: 1.35;
+    margin-top: 10px;
+  }}
+
+  /* ====== dica no mobile ====== */
+  .hint {{
+    display: none;
+    font-size: 12px;
+    color: var(--muted);
+    margin: 8px 6px 2px 6px;
+    user-select: none;
+  }}
+  @media (max-width: 820px) {{
+    .hint {{
+      display: block;
+    }}
+  }}
+
+  /* Scrollbar discreta (não some no iOS, mas fica leve em desktops) */
+  .scroll-x::-webkit-scrollbar {{
+    height: 10px;
+  }}
+  .scroll-x::-webkit-scrollbar-thumb {{
+    background: rgba(107,114,128,0.35);
+    border-radius: 999px;
+  }}
+  .scroll-x::-webkit-scrollbar-track {{
+    background: rgba(229,231,235,0.6);
+    border-radius: 999px;
   }}
 </style>
 </head>
+
 <body>
-<div class="wrap">
-  <canvas id="cv" width="640" height="420"></canvas>
-  <div class="meta">
-    <h4>Parâmetros (3 algarismos significativos)</h4>
-    <div class="badge">L = {fmt3(L)} m</div>
-    <div class="badge">g = {fmt3(g)} m/s²</div>
-    <div class="badge">θ₀ = {fmt3(theta0)} rad</div>
-    <div class="badge">T = {fmt3(T)} s</div>
-    <div class="badge">ω₀ = {fmt3(omega0)} rad/s</div>
-    <div class="badge">φ = {fmt3(phi)} rad</div>
-    <p class="small">
-      Convenção: direita (+), esquerda (−).<br/>
-      θ(t)=|θ₀|·sin(ω₀t+φ).
-    </p>
+  <div class="hint">📱 No celular: arraste para o lado para ver todo o conteúdo.</div>
+
+  <div class="scroll-x" id="scrollx">
+    <div class="content">
+      <canvas id="cv" width="640" height="420"></canvas>
+
+      <div class="meta">
+        <h4>Parâmetros (3 algarismos significativos)</h4>
+        <div class="badge">L = {fmt3(L)} m</div>
+        <div class="badge">g = {fmt3(g)} m/s²</div>
+        <div class="badge">θ₀ = {fmt3(theta0)} rad</div>
+        <div class="badge">T = {fmt3(T)} s</div>
+        <div class="badge">ω₀ = {fmt3(omega0)} rad/s</div>
+        <div class="badge">φ = {fmt3(phi)} rad</div>
+        <p class="small">
+          Convenção: direita (+), esquerda (−).<br/>
+          θ(t)=|θ₀|·sin(ω₀t+φ).
+        </p>
+      </div>
+    </div>
   </div>
-</div>
 
 <script>
-(() => {{
+(() => {
   const L = {float(L)};
   const theta0 = {float(theta0)};
   const w = {float(omega0)};
@@ -201,7 +281,7 @@ def build_anim_html(L, g, theta0, T, omega0, phi):
   const ctx = cv.getContext("2d");
 
   const W = cv.width, H = cv.height;
-  const pivot = {{x: W*0.5, y: 40}};
+  const pivot = {x: W*0.5, y: 40};
   const Lmax = 5.0;
   const lengthPx = (H - 120) * (L / Lmax);
 
@@ -210,7 +290,7 @@ def build_anim_html(L, g, theta0, T, omega0, phi):
 
   let t0 = performance.now();
 
-  function draw(now) {{
+  function draw(now) {
     const t = (now - t0)/1000.0;
     const th = thetaM * Math.sin(w*t + phi);
 
@@ -257,10 +337,39 @@ def build_anim_html(L, g, theta0, T, omega0, phi):
     ctx.fillText("θ(t) = " + toPrec3(th) + " rad", 16, 42);
 
     requestAnimationFrame(draw);
-  }}
+  }
 
   requestAnimationFrame(draw);
-}})();
+
+  // ====== EXTRA (opcional): drag-to-scroll no desktop (mouse) ======
+  // No celular, o swipe nativo já resolve.
+  const sc = document.getElementById("scrollx");
+  let isDown = false;
+  let startX = 0;
+  let scrollLeft = 0;
+
+  sc.addEventListener("pointerdown", (e) => {
+    // Evita capturar toques no mobile (onde o scroll nativo é melhor)
+    // mas mantém para mouse/trackpad.
+    if (e.pointerType === "touch") return;
+    isDown = true;
+    startX = e.pageX;
+    scrollLeft = sc.scrollLeft;
+    sc.setPointerCapture?.(e.pointerId);
+  });
+
+  sc.addEventListener("pointermove", (e) => {
+    if (!isDown) return;
+    const dx = e.pageX - startX;
+    sc.scrollLeft = scrollLeft - dx;
+  });
+
+  const stop = () => { isDown = false; };
+  sc.addEventListener("pointerup", stop);
+  sc.addEventListener("pointercancel", stop);
+  sc.addEventListener("pointerleave", stop);
+
+})();
 </script>
 </body>
 </html>
@@ -560,7 +669,7 @@ st.divider()
 st.subheader("Animação")
 
 anim_html = build_anim_html(L, g, theta0, T, omega0, phi)
-components.html(anim_html, height=460, scrolling=False)
+components.html(anim_html, height=500, scrolling=False)
 
 
 # ----------------------------
@@ -575,3 +684,4 @@ st_image_full_width(png1)
 st_image_full_width(png2)
 
 st.caption("Observação: energias calculadas no regime de pequenos ângulos (aproximação harmônica), com massa m = 1 kg.")
+``
