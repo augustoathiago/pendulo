@@ -125,10 +125,11 @@ def compute_scalars(L, g, theta0):
 @st.cache_data(ttl=3600, max_entries=64, show_spinner=False)
 def build_anim_html(L, g, theta0, T, omega0, phi):
     """
-    Melhorias mobile:
-    - Container horizontal rolável por toque (finger swipe)
-    - 'Arraste para o lado...' aparece no mobile
-    - (opcional) drag-to-scroll no desktop com mouse
+    Melhoria Mobile:
+    - Contêiner com rolagem horizontal (swipe) via overflow-x: auto
+    - touch-action: pan-x e -webkit-overflow-scrolling: touch
+    - layout não quebra linha (nowrap) para poder "arrastar para o lado"
+    Observação: é importante usar components.html(..., scrolling=True)
     """
     L, g, theta0 = quantize_params(L, g, theta0)
     T = float(T)
@@ -142,60 +143,46 @@ def build_anim_html(L, g, theta0, T, omega0, phi):
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
-  :root {{
-    --card: #ffffff;
-    --muted: #6b7280;
-    --line: #e5e7eb;
-    --shadow: 0 4px 16px rgba(0,0,0,0.08);
-  }}
-
-  body {{
+  /* Evita margens no iframe */
+  html, body {{
     margin: 0;
     padding: 0;
     background: transparent;
-    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
   }}
 
-  /* ====== NOVO: container rolável horizontal ====== */
-  .scroll-x {{
+  /* Contêiner com rolagem horizontal (swipe) */
+  .hscroll {{
     width: 100%;
     overflow-x: auto;
     overflow-y: hidden;
-    -webkit-overflow-scrolling: touch; /* iOS smooth scroll */
-    touch-action: pan-x;               /* prioriza gesto horizontal */
-    overscroll-behavior-x: contain;
-    padding: 2px 2px 10px 2px;
+    -webkit-overflow-scrolling: touch; /* iOS */
+    touch-action: pan-x;               /* gesto horizontal */
+    padding: 6px 4px;
     box-sizing: border-box;
-    cursor: grab;
-  }}
-  .scroll-x:active {{
-    cursor: grabbing;
   }}
 
-  /* conteúdo interno precisa “ter largura” para gerar overflow */
-  .content {{
-    display: flex;
+  /* Conteúdo em linha (não quebra), com largura "do conteúdo" */
+  .wrap {{
+    display: inline-flex;
     gap: 16px;
     align-items: flex-start;
-    flex-wrap: nowrap;       /* não quebrar linha => vira rolagem horizontal */
-    width: max-content;      /* largura do conteúdo */
-    padding: 6px;
-    box-sizing: border-box;
+    flex-wrap: nowrap;     /* <<< não quebrar */
+    width: max-content;    /* <<< permite rolar */
   }}
 
   canvas {{
     border: 1px solid #ddd;
     border-radius: 14px;
-    box-shadow: var(--shadow);
-    background: var(--card);
-    flex: 0 0 auto;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    background: #fff;
+    /* mantém o canvas nítido, mas permite reduzir visualmente */
+    max-width: 100%;
   }}
 
   .meta {{
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
     min-width: 260px;
-    max-width: 360px;
-    flex: 0 0 auto;
-    background: rgba(255,255,255,0.0);
+    max-width: 340px;
   }}
   .meta h4 {{
     margin: 0 0 8px 0;
@@ -208,49 +195,28 @@ def build_anim_html(L, g, theta0, T, omega0, phi):
     background: #f3f4f6;
     margin: 4px 6px 0 0;
     font-size: 12px;
-    border: 1px solid var(--line);
+    white-space: nowrap;
   }}
   .small {{
     color: #444;
     font-size: 13px;
     line-height: 1.35;
-    margin-top: 10px;
   }}
 
-  /* ====== dica no mobile ====== */
+  /* Dica discreta no mobile */
   .hint {{
-    display: none;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
     font-size: 12px;
-    color: var(--muted);
-    margin: 8px 6px 2px 6px;
-    user-select: none;
-  }}
-  @media (max-width: 820px) {{
-    .hint {{
-      display: block;
-    }}
-  }}
-
-  /* Scrollbar discreta (não some no iOS, mas fica leve em desktops) */
-  .scroll-x::-webkit-scrollbar {{
-    height: 10px;
-  }}
-  .scroll-x::-webkit-scrollbar-thumb {{
-    background: rgba(107,114,128,0.35);
-    border-radius: 999px;
-  }}
-  .scroll-x::-webkit-scrollbar-track {{
-    background: rgba(229,231,235,0.6);
-    border-radius: 999px;
+    color: #6b7280;
+    margin: 0 0 6px 2px;
   }}
 </style>
 </head>
-
 <body>
-  <div class="hint">📱 No celular: arraste para o lado para ver todo o conteúdo.</div>
+  <div class="hint">📱 No celular, arraste para os lados para ver toda a animação.</div>
 
-  <div class="scroll-x" id="scrollx">
-    <div class="content">
+  <div class="hscroll">
+    <div class="wrap">
       <canvas id="cv" width="640" height="420"></canvas>
 
       <div class="meta">
@@ -270,7 +236,7 @@ def build_anim_html(L, g, theta0, T, omega0, phi):
   </div>
 
 <script>
-(() => {
+(() => {{
   const L = {float(L)};
   const theta0 = {float(theta0)};
   const w = {float(omega0)};
@@ -281,7 +247,7 @@ def build_anim_html(L, g, theta0, T, omega0, phi):
   const ctx = cv.getContext("2d");
 
   const W = cv.width, H = cv.height;
-  const pivot = {x: W*0.5, y: 40};
+  const pivot = {{x: W*0.5, y: 40}};
   const Lmax = 5.0;
   const lengthPx = (H - 120) * (L / Lmax);
 
@@ -290,7 +256,7 @@ def build_anim_html(L, g, theta0, T, omega0, phi):
 
   let t0 = performance.now();
 
-  function draw(now) {
+  function draw(now) {{
     const t = (now - t0)/1000.0;
     const th = thetaM * Math.sin(w*t + phi);
 
@@ -337,39 +303,10 @@ def build_anim_html(L, g, theta0, T, omega0, phi):
     ctx.fillText("θ(t) = " + toPrec3(th) + " rad", 16, 42);
 
     requestAnimationFrame(draw);
-  }
+  }}
 
   requestAnimationFrame(draw);
-
-  // ====== EXTRA (opcional): drag-to-scroll no desktop (mouse) ======
-  // No celular, o swipe nativo já resolve.
-  const sc = document.getElementById("scrollx");
-  let isDown = false;
-  let startX = 0;
-  let scrollLeft = 0;
-
-  sc.addEventListener("pointerdown", (e) => {
-    // Evita capturar toques no mobile (onde o scroll nativo é melhor)
-    // mas mantém para mouse/trackpad.
-    if (e.pointerType === "touch") return;
-    isDown = true;
-    startX = e.pageX;
-    scrollLeft = sc.scrollLeft;
-    sc.setPointerCapture?.(e.pointerId);
-  });
-
-  sc.addEventListener("pointermove", (e) => {
-    if (!isDown) return;
-    const dx = e.pageX - startX;
-    sc.scrollLeft = scrollLeft - dx;
-  });
-
-  const stop = () => { isDown = false; };
-  sc.addEventListener("pointerup", stop);
-  sc.addEventListener("pointercancel", stop);
-  sc.addEventListener("pointerleave", stop);
-
-})();
+}})();
 </script>
 </body>
 </html>
@@ -669,7 +606,9 @@ st.divider()
 st.subheader("Animação")
 
 anim_html = build_anim_html(L, g, theta0, T, omega0, phi)
-components.html(anim_html, height=500, scrolling=False)
+
+# >>> MELHORIA PRINCIPAL: habilita rolagem no iframe (necessário no celular)
+components.html(anim_html, height=500, scrolling=True)
 
 
 # ----------------------------
@@ -684,4 +623,3 @@ st_image_full_width(png1)
 st_image_full_width(png2)
 
 st.caption("Observação: energias calculadas no regime de pequenos ângulos (aproximação harmônica), com massa m = 1 kg.")
-``
